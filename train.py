@@ -6,12 +6,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from utils.dataset_utils import PromptTrainDataset
+from utils.dataset_utils import MDDataset, PromptTrainDataset
 from net.model import PromptIR
 from utils.schedulers import LinearWarmupCosineAnnealingLR
 import numpy as np
 import wandb
 from options import options as opt
+from options import opt_dict
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger,TensorBoardLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -47,20 +48,19 @@ class PromptIRModel(pl.LightningModule):
 
         return [optimizer],[scheduler]
 
-
-
-
-
-
 def main():
     print("Options")
     print(opt)
+    
+    dataset_opt = opt_dict["datasets"]["train"]
+    
     if opt.wblogger is not None:
         logger  = WandbLogger(project=opt.wblogger,name="PromptIR-Train")
     else:
         logger = TensorBoardLogger(save_dir = "logs/")
 
-    trainset = PromptTrainDataset(opt)
+    # trainset = PromptTrainDataset(opt)
+    trainset = MDDataset(dataset_opt)
     checkpoint_callback = ModelCheckpoint(dirpath = opt.ckpt_dir,every_n_epochs = 1,save_top_k=-1)
     trainloader = DataLoader(trainset, batch_size=opt.batch_size, pin_memory=True, shuffle=True,
                              drop_last=True, num_workers=opt.num_workers)
