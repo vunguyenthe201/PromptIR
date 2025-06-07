@@ -11,7 +11,259 @@ import torch
 from utils.image_utils import random_augmentation, crop_img
 from utils.degradation_utils import Degradation
 
+
+import os
+import random
+import sys
+
+from PIL import Image
+import cv2
+import lmdb
+import numpy as np
+import torch
+import torch.utils.data as data
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize, InterpolationMode
+from torch.utils.data import DataLoader
+import torchvision 
+from PIL import Image
+
+
+def clip_transform(np_image, resolution=224):
+    try:
+        pil_image = Image.fromarray((np_image * 255).astype(np.uint8) + 1)
+        return Compose([
+            Resize(resolution, interpolation=InterpolationMode.BICUBIC),
+            CenterCrop(resolution), 
+            ToTensor(),
+            Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])(pil_image)
+    except Exception as e:
+        print(np_image)
+        print(np_image.shape)
+        # print(np_image.min(), np_image.max())
+        raise e
+
+
+IMG_EXTENSIONS = ['.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP', 'tif']
+
+
+def is_image_file(filename):
+    return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
+
+def _get_paths_from_images(path):
+    '''get image path list from image folder'''
+    assert os.path.isdir(path), '{:s} is not a valid directory'.format(path)
+    images = []
+    for dirpath, _, fnames in sorted(os.walk(path)):
+        for fname in sorted(fnames):
+            if is_image_file(fname):
+                img_path = os.path.join(dirpath, fname)
+                images.append(img_path)
+    assert images, '{:s} has no valid image file'.format(path)
+    return images
+
+def _get_paths_from_lmdb(dataroot):
+    '''get image path list from lmdb meta info'''
+    meta_info = pickle.load(open(os.path.join(dataroot, 'meta_info.pkl'), 'rb'))
+    paths = meta_info['keys']
+    sizes = meta_info['resolution']
+    if len(sizes) == 1:
+        sizes = sizes * len(paths)
+    return paths, sizes
+
+def get_image_paths(data_type, dataroot):
+    '''get image path list
+    support lmdb or image files'''
+    paths, sizes = None, None
+    if dataroot is not None:
+        if data_type == 'lmdb':
+            paths, sizes = _get_paths_from_lmdb(dataroot)
+            return paths, sizes
+        elif data_type == 'img':
+            paths = sorted(_get_paths_from_images(dataroot))
+            return paths
+        else:
+            raise NotImplementedError('data_type [{:s}] is not recognized.'.format(data_type))
+
+
+def _read_img_lmdb(env, key, size):
+    '''read image from lmdb with key (w/ and w/o fixed size)
+    size: (C, H, W) tuple'''
+    with env.begin(write=False) as txn:
+        buf = txn.get(key.encode('ascii'))
+    img_flat = np.frombuffer(buf, dtype=np.uint8)
+    C, H, W = size
+    img = img_flat.reshape(H, W, C)
+    return img
+
+
+def read_img(env, path, size=None):
+    '''read image by cv2 or from lmdb
+    return: Numpy float32, HWC, BGR, [0,1]'''
+    if env is None:  # img
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    else:
+        img = _read_img_lmdb(env, path, size)
+    img = img.astype(np.float32) / 255.
+    if img.ndim == 2:
+        img = np.expand_dims(img, axis=2)
+    # some images have 4 channels
+    if img.shape[2] > 3:
+        img = img[:, :, :3]
+    return img
+
+def augment(img, hflip=True, rot=True, mode=None):
+    # horizontal flip OR rotate
+    hflip = hflip and random.random() < 0.5
+    vflip = rot and random.random() < 0.5
+    rot90 = rot and random.random() < 0.5
+
+    def _augment(img):
+        if hflip:
+            img = img[:, ::-1, :]
+        if vflip:
+            img = img[::-1, :, :]
+        if rot90:
+            img = img.transpose(1, 0, 2)
+        return img
+    if mode in ['LQ','GT']:
+        return _augment(img)
+    elif mode in ['LQGT', 'MDGT', 'MD']:
+        return [_augment(I) for I in img]
+
+class MDDataset(data.Dataset):
+    """
+    Read LR (Low Quality, here is LR) and GT image pairs.
+    The pair is ensured by 'sorted' function, so please check the name convention.
+    """
+
+    def __init__(self, opt):
+        super().__init__()
+        self.opt = opt
+        self.size = opt["patch_size"]
+        self.deg_types = opt["distortion"]
+
+        self.distortion = {}
+        for deg_type in opt["distortion"]:
+            GT_paths = get_image_paths(
+                opt["data_type"], os.path.join(opt["dataroot"], deg_type, 'HQ')
+            )  # GT list
+            LR_paths = get_image_paths(
+                opt["data_type"], os.path.join(opt["dataroot"], deg_type, 'LQ')
+            )  # LR list
+            self.distortion[deg_type] = (GT_paths, LR_paths)
+        self.data_lens = [len(self.distortion[deg_type][0]) for deg_type in self.deg_types]
+
+        self.random_scale_list = [1]
+        
+    def _crop_patch(self, img_1, img_2):
+        H = img_1.shape[0]
+        W = img_1.shape[1]
+        ind_H = random.randint(0, H - self.size)
+        ind_W = random.randint(0, W - self.size)
+
+        patch_1 = img_1[ind_H:ind_H + self.size, ind_W:ind_W + self.size]
+        patch_2 = img_2[ind_H:ind_H + self.size, ind_W:ind_W + self.size]
+
+        return patch_1, patch_2
+
+    def __getitem__(self, index):
+
+        # choose degradation type and data index
+        # type_id, deg_type = 0, self.deg_types[0]
+        #  while index >= len(self.distortion[deg_type][0]):
+        #     type_id += 1
+        #     index -= len(self.distortion[deg_type][0])
+        #     deg_type = self.deg_types[type_id]
+
+        type_id = int(index % len(self.deg_types))
+        if self.opt["phase"] == "train":
+            deg_type = self.deg_types[type_id]
+            index = np.random.randint(self.data_lens[type_id])
+        else:
+            while index // len(self.deg_types) >= self.data_lens[type_id]:
+                index += 1
+                type_id = int(index % len(self.deg_types))
+            deg_type = self.deg_types[type_id]
+            index = index // len(self.deg_types)
+
+        # get GT image
+        GT_path = self.distortion[deg_type][0][index]
+        img_GT = read_img(
+            None, GT_path, None
+        )  # return: Numpy float32, HWC, BGR, [0,1]
+
+        # get LQ image
+        LQ_path = self.distortion[deg_type][1][index]
+        img_LQ = read_img(
+            None, LQ_path, None
+        )  # return: Numpy float32, HWC, BGR, [0,1]
+        
+        original_GT_shape = img_GT.shape
+        original_LQ_shape = img_LQ.shape
+        
+        if self.opt["phase"] == "train":
+            H, W, C = img_GT.shape
+            if deg_type == "jpeg-compressed":
+                # random crop for jpeg compression
+                rnd_h = random.randint(0, max(0, H - self.size))
+                rnd_w = random.randint(0, max(0, W - self.size))
+                comress_ratio = img_GT.shape[0] // img_LQ.shape[0]
+                img_GT = img_GT[rnd_h : rnd_h + self.size, rnd_w : rnd_w + self.size, :]
+                img_LQ = img_LQ[rnd_h // comress_ratio : (rnd_h + self.size) // comress_ratio, rnd_w // comress_ratio : (rnd_w + self.size) // comress_ratio, :]
+            else:
+                rnd_h = random.randint(0, max(0, H - self.size))
+                rnd_w = random.randint(0, max(0, W - self.size))
+                img_GT = img_GT[rnd_h : rnd_h + self.size, rnd_w : rnd_w + self.size, :]
+                img_LQ = img_LQ[rnd_h : rnd_h + self.size, rnd_w : rnd_w + self.size, :]
+
+            # # augmentation - flip, rotate
+            degrad_patch, clean_patch = augment(
+                [img_LQ, img_GT],
+                self.opt["use_flip"],
+                self.opt["use_rot"],
+                mode=self.opt["mode"],
+            )
+            
+            # degrad_patch, clean_patch = random_augmentation(img_LQ, img_GT)
+
+        # change color space if necessary
+        # if self.opt["color"]:
+        #     img_GT = util.channel_convert(img_GT.shape[2], self.opt["color"], [img_GT])[0]
+        #     img_LQ = util.channel_convert(img_LQ.shape[2], self.opt["color"], [img_LQ])[0]
     
+        
+        # print(GT_path, LQ_path, original_GT_shape, original_LQ_shape , img_GT.shape, img_LQ.shape, clean_patch.shape, degrad_patch.shape,)
+        
+        # BGR to RGB, HWC to CHW, numpy to tensor
+        if degrad_patch.shape[2] == 3:
+            degrad_patch = degrad_patch[:, :, [2, 1, 0]]
+            clean_patch = clean_patch[:, :, [2, 1, 0]]
+            
+        # torchvision.utils.save_image(torch.from_numpy(np.ascontiguousarray(degrad_patch)).float(), f"images/degrad.png")
+        # torchvision.utils.save_image(torch.from_numpy(np.ascontiguousarray(clean_patch)).float(), f"images/clean.png")        
+
+        # gt4clip = clip_transform(img_GT)
+        degrad_patch = clip_transform(degrad_patch)
+        clean_patch = clip_transform(clean_patch)
+                
+        degrad_patch = torch.from_numpy(np.ascontiguousarray(degrad_patch)).float()
+        clean_patch = torch.from_numpy(np.ascontiguousarray(clean_patch)).float()
+        
+        
+        
+        
+        return ["", ""], degrad_patch, clean_patch
+
+        # img_GT = torch.from_numpy(np.ascontiguousarray(np.transpose(img_GT, (2, 0, 1)))).float()
+        # img_LQ = torch.from_numpy(np.ascontiguousarray(np.transpose(img_LQ, (2, 0, 1)))).float()
+
+        # return {"GT": img_GT, "LQ": img_LQ, "LQ_clip": lq4clip,  "type": deg_type, "GT_path": GT_path}
+
+    def __len__(self):
+        return np.sum(self.data_lens)
+
+
+
 class PromptTrainDataset(Dataset):
     def __init__(self, args):
         super(PromptTrainDataset, self).__init__()
