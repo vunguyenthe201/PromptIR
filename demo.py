@@ -4,10 +4,11 @@ from tqdm import tqdm
 import numpy as np
 
 import torch
+import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from net.model import PromptIR
 
-from utils.dataset_utils import TestSpecificDataset
+from utils.dataset_utils import TestSpecificDataset, random_augmentation, crop_img
 from utils.image_io import save_image_tensor
 import lightning.pytorch as pl
 import torch.nn.functional as F
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     # Make network
     if torch.cuda.is_available():
         torch.cuda.set_device(opt.cuda)
-    net  = PromptIRModel().load_from_checkpoint(ckpt_path).to(device)
+    net  = PromptIRModel.load_from_checkpoint(ckpt_path).to(device)
     net.eval()
 
     test_set = TestSpecificDataset(opt)
@@ -113,11 +114,14 @@ if __name__ == '__main__':
 
     print('Start testing...')
     with torch.no_grad():
-        for ([clean_name], degrad_patch) in tqdm(testloader):
+        for ([clean_name], degrad_patch, original_shape) in tqdm(testloader):
             degrad_patch = degrad_patch.to(device)
-
+            print(original_shape)
+            
             if opt.tile is False:
                 restored = net(degrad_patch)
+                restored = transforms.Resize((original_shape[0].item(), original_shape[1].item()))(restored)
+                print(restored.shape)
             else:
                 print("Using Tiling")
                 degrad_patch,h,w = pad_input(degrad_patch)

@@ -583,6 +583,9 @@ class TestSpecificDataset(Dataset):
 
     def __getitem__(self, idx):
         degraded_img = crop_img(np.array(Image.open(self.degraded_ids[idx]).convert('RGB')), base=16)
+        # degraded_img = np.array(Image.open(self.degraded_ids[idx]).convert('RGB'))
+        # original_shape = degraded_img.shape
+        # degraded_img = crop_img(degraded_img, base=16)
         name = self.degraded_ids[idx].split('/')[-1][:-4]
 
         degraded_img = self.toTensor(degraded_img)
