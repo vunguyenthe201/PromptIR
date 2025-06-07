@@ -24,43 +24,43 @@ datasets:
   gaussian-blurry:
     name: Gaussian_Blurry_Dataset
     mode: LQGT 
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/gaussian-blurry/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/gaussian-blurry/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/gaussian-blurry/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/gaussian-blurry/LQ
   hazy:
     name: Hazy_Dataset
     mode: LQGT
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/hazy/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/hazy/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/hazy/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/hazy/LQ
   jpeg-compressed:
     name: Jpeg_Compressed_Dataset
     mode: LQGT
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/jpeg-compressed/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/jpeg-compressed/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/jpeg-compressed/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/jpeg-compressed/LQ
   low-light:
     name: Low_Light_Dataset
     mode: LQGT 
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/low-light/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/low-light/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/low-light/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/low-light/LQ
   motion-blurry:
     name: Motion_Blurry_Dataset
     mode: LQGT
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/motion-blurry/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/motion-blurry/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/motion-blurry/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/motion-blurry/LQ
   noisy:
     name: Noisy_Dataset
     mode: LQGT
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/noisy/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/noisy/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/noisy/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/noisy/LQ
   raindrop:
     name: Raindrop_Dataset
     mode: LQGT
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/raindrop/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/raindrop/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/raindrop/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/raindrop/LQ
   snowy:
     name: Snowy_Dataset
     mode: LQGT
-    dataroot_GT: /workspace/vunt/datasets/data_val_subset/snowy/GT
-    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/snowy/LQ
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset_50/snowy/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset_50/snowy/LQ
 
   infer:
     name: Infer

@@ -128,4 +128,4 @@ if __name__ == '__main__':
                 restored = tile_eval(net,degrad_patch,tile = opt.tile_size,tile_overlap=opt.tile_overlap)
                 restored = restored = restored[:,:,:h,:w]
 
-            save_image_tensor(restored, opt.output_path + clean_name[0] + '.png')
+            save_image_tensor(restored, os.path.join(opt.output_path, clean_name[0] + '.png'))

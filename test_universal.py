@@ -355,8 +355,11 @@ if __name__ == '__main__':
             #     LQ = resize(LQ)
             #     GT = resize(GT)
             
-            LQ = resize(LQ)
-            GT = resize(GT)
+            # LQ = resize(LQ)
+            # GT = resize(GT)
+            
+            LQ = center_crop(LQ)
+            GT = center_crop(GT)
                 
             with torch.no_grad():
                 LQ = LQ.cuda()
