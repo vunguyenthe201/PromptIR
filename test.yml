@@ -1,0 +1,73 @@
+name: universal-ir
+suffix: ~  # add suffix to saved images
+model: denoising
+distortion: [gaussian-blurry,hazy,jpeg-compressed,low-light,motion-blurry,noisy,raindrop,snowy]
+gpu_ids: [0,1,2,3,4,5,6,7]
+tile: True
+
+sde:
+  max_sigma: 50
+  T: 100
+  schedule: cosine # linear, cosine
+  eps: 0.005
+  sampling_mode: posterior # sde or posterior
+  
+degradation:
+  # for denoising
+  sigma: 25
+  noise_type: G # Gaussian noise: G
+
+  # for super-resolution
+  scale: 4
+
+datasets:
+  gaussian-blurry:
+    name: Gaussian_Blurry_Dataset
+    mode: LQGT 
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/gaussian-blurry/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/gaussian-blurry/LQ
+  hazy:
+    name: Hazy_Dataset
+    mode: LQGT
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/hazy/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/hazy/LQ
+  jpeg-compressed:
+    name: Jpeg_Compressed_Dataset
+    mode: LQGT
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/jpeg-compressed/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/jpeg-compressed/LQ
+  low-light:
+    name: Low_Light_Dataset
+    mode: LQGT 
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/low-light/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/low-light/LQ
+  motion-blurry:
+    name: Motion_Blurry_Dataset
+    mode: LQGT
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/motion-blurry/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/motion-blurry/LQ
+  noisy:
+    name: Noisy_Dataset
+    mode: LQGT
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/noisy/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/noisy/LQ
+  raindrop:
+    name: Raindrop_Dataset
+    mode: LQGT
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/raindrop/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/raindrop/LQ
+  snowy:
+    name: Snowy_Dataset
+    mode: LQGT
+    dataroot_GT: /workspace/vunt/datasets/data_val_subset/snowy/GT
+    dataroot_LQ: /workspace/vunt/datasets/data_val_subset/snowy/LQ
+
+  infer:
+    name: Infer
+    mode: LQGT
+    dataroot_LQ: /workspace/vunt/datasets/infer
+    dataroot_GT: /workspace/vunt/datasets/infer
+
+#### path
+path:
+  results_root: /workspace/vunt/PromptIR/results
